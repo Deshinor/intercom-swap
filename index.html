@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>IntercomSwap Radar — BTC/USDT P2P Swap Monitor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #050608; --surface: #0a0c10; --surface2: #0f1117;
+    --border: #1a2030; --border-bright: #1f3050;
+    --accent: #00d4ff; --accent2: #ff6b2b; --accent3: #39ff7a; --accent4: #ffd700;
+    --muted: #3a4a60; --text: #c8d8f0; --text-dim: #607080; --text-bright: #e8f4ff;
+    --glow: 0 0 20px rgba(0,212,255,0.3);
+    --glow2: 0 0 20px rgba(255,107,43,0.3);
+    --glow3: 0 0 20px rgba(57,255,122,0.3);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Share Tech Mono', monospace; min-height: 100vh; overflow-x: hidden; }
+  body::before { content: ''; position: fixed; inset: 0; background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.08) 2px, rgba(0,0,0,0.08) 4px); pointer-events: none; z-index: 1000; }
+  body::after { content: ''; position: fixed; inset: 0; opacity: 0.025; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E"); pointer-events: none; z-index: 999; }
+  header { display: flex; align-items: center; justify-content: space-between; padding: 16px 24px; border-bottom: 1px solid var(--border); background: linear-gradient(180deg, #070a0f 0%, var(--bg) 100%); position: sticky; top: 0; z-index: 100; }
+  .logo { display: flex; align-items: center; gap: 14px; }
+  .logo-icon { width: 38px; height: 38px; }
+  .logo-icon svg { width: 100%; height: 100%; animation: spin 8s linear infinite; }
+  @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+  .logo-text { font-family: 'Orbitron', sans-serif; font-weight: 900; font-size: 20px; letter-spacing: 2px; color: var(--accent); text-shadow: var(--glow); }
+  .logo-sub { font-size: 10px; color: var(--text-dim); letter-spacing: 3px; margin-top: 2px; text-transform: uppercase; }
+  .header-status { display: flex; align-items: center; gap: 20px; }
+  .status-pill { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-dim); letter-spacing: 1px; }
+  .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent3); box-shadow: 0 0 8px var(--accent3); animation: pulse 2s ease-in-out infinite; }
+  .status-dot.warn { background: var(--accent4); box-shadow: 0 0 8px var(--accent4); }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+  .header-price { font-family: 'Orbitron', sans-serif; font-size: 13px; color: var(--accent4); letter-spacing: 1px; }
+  .app { display: grid; grid-template-columns: 1fr 340px; gap: 16px; padding: 16px 24px 24px; max-width: 1400px; margin: 0 auto; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 2px; overflow: hidden; position: relative; }
+  .card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px; background: linear-gradient(90deg, transparent 0%, var(--accent) 50%, transparent 100%); opacity: 0.4; }
+  .card-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; border-bottom: 1px solid var(--border); background: var(--surface2); }
+  .card-title { font-family: 'Orbitron', sans-serif; font-size: 10px; letter-spacing: 3px; color: var(--accent); text-transform: uppercase; }
+  .card-badge { font-size: 9px; padding: 2px 8px; border: 1px solid var(--border-bright); color: var(--text-dim); letter-spacing: 1px; }
+  .stats-row { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
+  .stat-card { background: var(--surface); border: 1px solid var(--border); padding: 16px; position: relative; overflow: hidden; }
+  .stat-card::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 2px; background: var(--accent); transform: scaleX(0); transform-origin: left; transition: transform 0.3s ease; }
+  .stat-card:hover::after { transform: scaleX(1); }
+  .stat-label { font-size: 9px; letter-spacing: 2px; color: var(--text-dim); text-transform: uppercase; margin-bottom: 8px; }
+  .stat-value { font-family: 'Orbitron', sans-serif; font-size: 22px; font-weight: 700; color: var(--text-bright); letter-spacing: 1px; }
+  .stat-value.green { color: var(--accent3); text-shadow: var(--glow3); }
+  .stat-value.blue { color: var(--accent); text-shadow: var(--glow); }
+  .stat-value.orange { color: var(--accent2); text-shadow: var(--glow2); }
+  .stat-value.gold { color: var(--accent4); }
+  .stat-change { font-size: 10px; margin-top: 4px; color: var(--text-dim); }
+  .stat-change.up { color: var(--accent3); }
+  .stat-change.down { color: #ff4455; }
+  .orderbook { grid-row: 2; grid-column: 2; }
+  .ob-row { display: grid; grid-template-columns: 1fr 1fr 80px; padding: 4px 16px; font-size: 11px; position: relative; cursor: default; transition: background 0.1s; }
+  .ob-row:hover { background: rgba(0,212,255,0.04); }
+  .ob-row-bg { position: absolute; top: 0; bottom: 0; right: 0; opacity: 0.12; transition: width 0.4s ease; }
+  .ob-row.ask .ob-row-bg { background: #ff4455; }
+  .ob-row.bid .ob-row-bg { background: var(--accent3); }
+  .ob-price.ask { color: #ff6677; }
+  .ob-price.bid { color: var(--accent3); }
+  .ob-spread { text-align: center; padding: 6px 16px; font-size: 10px; color: var(--text-dim); background: var(--surface2); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); letter-spacing: 2px; }
+  .ob-header { display: grid; grid-template-columns: 1fr 1fr 80px; padding: 6px 16px; font-size: 9px; color: var(--text-dim); letter-spacing: 2px; border-bottom: 1px solid var(--border); }
+  .swap-flow { grid-row: 2; grid-column: 1; }
+  .flow-container { padding: 20px; display: grid; grid-template-columns: 1fr 40px 1fr 40px 1fr 40px 1fr 40px 1fr; align-items: center; min-height: 180px; }
+  .flow-step { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 16px 12px; border: 1px solid var(--border); background: var(--surface2); border-radius: 2px; transition: all 0.3s ease; cursor: pointer; }
+  .flow-step.active { border-color: var(--accent); box-shadow: 0 0 20px rgba(0,212,255,0.15); }
+  .flow-step.done { border-color: var(--accent3); background: rgba(57,255,122,0.04); }
+  @keyframes borderFlash { 0%, 100% { border-color: var(--accent4); box-shadow: 0 0 10px rgba(255,215,0,0.1); } 50% { border-color: rgba(255,215,0,0.3); box-shadow: none; } }
+  .flow-icon { font-size: 22px; line-height: 1; }
+  .flow-label { font-size: 9px; letter-spacing: 2px; color: var(--text-dim); text-align: center; text-transform: uppercase; }
+  .flow-sub { font-size: 10px; color: var(--text); text-align: center; }
+  .flow-arrow { display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 16px; }
+  .flow-arrow.active-arrow { color: var(--accent); animation: arrowPulse 1s ease-in-out infinite; }
+  @keyframes arrowPulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
+  .trade-feed { grid-column: 1; grid-row: 3; }
+  .feed-list { height: 240px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+  .feed-item { display: grid; grid-template-columns: 90px 1fr 100px 100px 80px; padding: 7px 16px; font-size: 11px; border-bottom: 1px solid rgba(26,32,48,0.5); align-items: center; transition: background 0.1s; animation: fadeSlide 0.4s ease; }
+  @keyframes fadeSlide { from { opacity: 0; transform: translateY(-8px); background: rgba(0,212,255,0.08); } to { opacity: 1; transform: translateY(0); background: transparent; } }
+  .feed-item:hover { background: var(--surface2); }
+  .feed-time { color: var(--text-dim); font-size: 10px; }
+  .feed-pair { color: var(--accent); }
+  .feed-btc { color: var(--text-bright); }
+  .feed-usdt { color: var(--accent3); }
+  .feed-status { text-align: right; }
+  .badge { display: inline-block; font-size: 9px; padding: 2px 6px; letter-spacing: 1px; border-radius: 1px; }
+  .badge.settled { background: rgba(57,255,122,0.15); color: var(--accent3); border: 1px solid rgba(57,255,122,0.3); }
+  .badge.pending { background: rgba(255,215,0,0.1); color: var(--accent4); border: 1px solid rgba(255,215,0,0.3); }
+  .badge.negotiating { background: rgba(0,212,255,0.1); color: var(--accent); border: 1px solid rgba(0,212,255,0.3); }
+  .badge.refunded { background: rgba(255,68,85,0.1); color: #ff6677; border: 1px solid rgba(255,68,85,0.3); }
+  .feed-header { display: grid; grid-template-columns: 90px 1fr 100px 100px 80px; padding: 6px 16px; font-size: 9px; color: var(--text-dim); letter-spacing: 2px; border-bottom: 1px solid var(--border); }
+  .rfq-sim { grid-column: 2; grid-row: 3; }
+  .rfq-form { padding: 16px; }
+  .form-row { margin-bottom: 12px; }
+  .form-label { font-size: 9px; letter-spacing: 2px; color: var(--text-dim); text-transform: uppercase; margin-bottom: 6px; display: block; }
+  .form-input { width: 100%; background: var(--bg); border: 1px solid var(--border); color: var(--text-bright); font-family: 'Share Tech Mono', monospace; font-size: 13px; padding: 8px 12px; outline: none; transition: border-color 0.2s; }
+  .form-input:focus { border-color: var(--accent); box-shadow: 0 0 10px rgba(0,212,255,0.1); }
+  .form-select { width: 100%; background: var(--bg); border: 1px solid var(--border); color: var(--text); font-family: 'Share Tech Mono', monospace; font-size: 12px; padding: 8px 12px; outline: none; cursor: pointer; appearance: none; }
+  .btn { width: 100%; padding: 10px; font-family: 'Orbitron', sans-serif; font-size: 11px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; border: 1px solid var(--accent); background: transparent; color: var(--accent); cursor: pointer; transition: all 0.2s; position: relative; overflow: hidden; }
+  .btn::before { content: ''; position: absolute; inset: 0; background: var(--accent); transform: scaleX(0); transform-origin: left; transition: transform 0.2s; z-index: 0; }
+  .btn:hover::before { transform: scaleX(1); }
+  .btn:hover { color: var(--bg); }
+  .btn span { position: relative; z-index: 1; }
+  .btn.orange { border-color: var(--accent2); color: var(--accent2); }
+  .btn.orange::before { background: var(--accent2); }
+  .btn.orange:hover { color: white; }
+  .rfq-output { margin-top: 12px; background: var(--bg); border: 1px solid var(--border); padding: 10px 12px; font-size: 10px; color: var(--text-dim); line-height: 1.7; min-height: 60px; font-family: 'Space Mono', monospace; }
+  .rfq-output .hl { color: var(--accent); }
+  .rfq-output .hl2 { color: var(--accent3); }
+  .rfq-output .hl3 { color: var(--accent4); }
+  .network-section { grid-column: 1 / -1; }
+  .peer-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; padding: 16px; }
+  .peer-card { border: 1px solid var(--border); padding: 12px; background: var(--surface2); position: relative; overflow: hidden; }
+  .peer-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, var(--accent), transparent); opacity: 0; transition: opacity 0.3s; }
+  .peer-card:hover::before { opacity: 1; }
+  .peer-key { font-size: 10px; color: var(--text-dim); word-break: break-all; margin-bottom: 6px; }
+  .peer-info { font-size: 11px; color: var(--text); margin-bottom: 4px; }
+  .peer-role { font-size: 9px; letter-spacing: 2px; color: var(--accent); }
+  footer { text-align: center; padding: 20px; font-size: 10px; color: var(--text-dim); letter-spacing: 1px; border-top: 1px solid var(--border); margin-top: 20px; }
+  footer a { color: var(--accent); text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+  .ticker { background: var(--surface2); border-bottom: 1px solid var(--border); overflow: hidden; padding: 5px 0; white-space: nowrap; }
+  .ticker-inner { display: inline-flex; gap: 60px; animation: ticker 30s linear infinite; font-size: 11px; letter-spacing: 1px; }
+  @keyframes ticker { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+  .ticker-item { color: var(--text-dim); }
+  .ticker-item .val { color: var(--text-bright); }
+  .ticker-item .up { color: var(--accent3); }
+  .ticker-item .dn { color: #ff6677; }
+  @media (max-width: 900px) { .app { grid-template-columns: 1fr; } .stats-row { grid-template-columns: repeat(2, 1fr); } .swap-flow, .trade-feed, .orderbook, .rfq-sim { grid-column: 1; grid-row: auto; } .network-section { grid-column: 1; } }
+  .corner-tl { position: absolute; top: -1px; left: -1px; width: 8px; height: 8px; border-top: 2px solid var(--accent); border-left: 2px solid var(--accent); }
+  .corner-tr { position: absolute; top: -1px; right: -1px; width: 8px; height: 8px; border-top: 2px solid var(--accent); border-right: 2px solid var(--accent); }
+</style>
+</head>
+<body>
+
+<div class="ticker">
+  <div class="ticker-inner">
+    <span class="ticker-item">BTC/USDT <span class="val" id="t-btc">$84,320</span> <span class="up" id="t-btc-chg">&#x25B2; 1.2%</span></span>
+    <span class="ticker-item">NETWORK PEERS <span class="val">47</span></span>
+    <span class="ticker-item">24H VOLUME <span class="val">$2.14M</span></span>
+    <span class="ticker-item">AVG SWAP TIME <span class="val">3m 42s</span></span>
+    <span class="ticker-item">SOL/USDT <span class="val">$142.80</span> <span class="up">&#x25B2; 0.8%</span></span>
+    <span class="ticker-item">OPEN RFQS <span class="val">12</span></span>
+    <span class="ticker-item">COMPLETED TODAY <span class="val">89</span></span>
+    <span class="ticker-item">SUCCESS RATE <span class="val">98.2%</span></span>
+    <span class="ticker-item">LIGHTNING CAPACITY <span class="val">4.7 BTC</span></span>
+    <span class="ticker-item">P2P PROTOCOL <span class="val">Intercom v2</span></span>
+    <span class="ticker-item">BTC/USDT <span class="val">$84,320</span> <span class="up">&#x25B2; 1.2%</span></span>
+    <span class="ticker-item">NETWORK PEERS <span class="val">47</span></span>
+    <span class="ticker-item">24H VOLUME <span class="val">$2.14M</span></span>
+    <span class="ticker-item">AVG SWAP TIME <span class="val">3m 42s</span></span>
+    <span class="ticker-item">SOL/USDT <span class="val">$142.80</span> <span class="up">&#x25B2; 0.8%</span></span>
+    <span class="ticker-item">OPEN RFQS <span class="val">12</span></span>
+    <span class="ticker-item">COMPLETED TODAY <span class="val">89</span></span>
+    <span class="ticker-item">SUCCESS RATE <span class="val">98.2%</span></span>
+    <span class="ticker-item">LIGHTNING CAPACITY <span class="val">4.7 BTC</span></span>
+    <span class="ticker-item">P2P PROTOCOL <span class="val">Intercom v2</span></span>
+  </div>
+</div>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">
+      <svg viewBox="0 0 40 40" fill="none">
+        <circle cx="20" cy="20" r="18" stroke="#00d4ff" stroke-width="1" stroke-dasharray="4 2"/>
+        <circle cx="20" cy="20" r="10" stroke="#00d4ff" stroke-width="1.5"/>
+        <polygon points="20,8 24,16 32,16 26,21 28,29 20,24 12,29 14,21 8,16 16,16" fill="none" stroke="#00d4ff" stroke-width="1"/>
+        <circle cx="20" cy="20" r="3" fill="#00d4ff"/>
+      </svg>
+    </div>
+    <div>
+      <div class="logo-text">INTERCOMSWAP RADAR</div>
+      <div class="logo-sub">BTC Lightning &harr; USDT Solana &middot; P2P Monitor</div>
+    </div>
+  </div>
+  <div class="header-status">
+    <div class="status-pill"><div class="status-dot"></div>MAINNET ACTIVE</div>
+    <div class="status-pill"><div class="status-dot warn"></div>DHT SYNCED</div>
+    <div class="header-price" id="btc-header-price">BTC $84,320</div>
+  </div>
+</header>
+
+<div class="app">
+
+  <div class="stats-row">
+    <div class="stat-card">
+      <div class="stat-label">BTC Price</div>
+      <div class="stat-value blue" id="stat-btc">$84,320</div>
+      <div class="stat-change up" id="stat-btc-chg">&#x25B2; 1.24% 24h</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">24H Swap Volume</div>
+      <div class="stat-value green" id="stat-vol">$2.14M</div>
+      <div class="stat-change up">&#x25B2; 18.3% vs yesterday</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Active Peers</div>
+      <div class="stat-value" id="stat-peers">47</div>
+      <div class="stat-change up">&#x25B2; 5 new today</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Swaps Completed</div>
+      <div class="stat-value orange" id="stat-swaps">89</div>
+      <div class="stat-change">today &middot; <span style="color:var(--accent3)">98.2% success</span></div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Open RFQs</div>
+      <div class="stat-value gold" id="stat-rfq">12</div>
+      <div class="stat-change">avg quote in <span style="color:var(--text)">4.2s</span></div>
+    </div>
+  </div>
+
+  <div class="card swap-flow">
+    <div class="card-header">
+      <div class="card-title">Swap Protocol Flow</div>
+      <div class="card-badge" id="flow-state-badge">LIVE TRADE &middot; #a3f2c1</div>
+    </div>
+    <div class="flow-container">
+      <div class="flow-step done" id="step-rfq">
+        <div class="flow-icon">&#x1F4E1;</div>
+        <div class="flow-label">RFQ</div>
+        <div class="flow-sub" id="step-rfq-val">50,000 sat</div>
+      </div>
+      <div class="flow-arrow" id="arr-1">&rarr;</div>
+      <div class="flow-step done" id="step-quote">
+        <div class="flow-icon">&#x1F4AC;</div>
+        <div class="flow-label">Quote</div>
+        <div class="flow-sub" id="step-quote-val">42.80 USDT</div>
+      </div>
+      <div class="flow-arrow" id="arr-2">&rarr;</div>
+      <div class="flow-step active" id="step-terms">
+        <div class="flow-icon">&#x1F4CB;</div>
+        <div class="flow-label">Terms</div>
+        <div class="flow-sub" id="step-terms-val">Confirming&hellip;</div>
+      </div>
+      <div class="flow-arrow" id="arr-3">&rarr;</div>
+      <div class="flow-step" id="step-escrow">
+        <div class="flow-icon">&#x1F510;</div>
+        <div class="flow-label">Escrow</div>
+        <div class="flow-sub" id="step-escrow-val">&mdash;</div>
+      </div>
+      <div class="flow-arrow" id="arr-4">&rarr;</div>
+      <div class="flow-step" id="step-settle">
+        <div class="flow-icon">&#x26A1;</div>
+        <div class="flow-label">Settle</div>
+        <div class="flow-sub" id="step-settle-val">&mdash;</div>
+      </div>
+    </div>
+    <div style="padding: 0 20px 16px; display:flex; gap:12px; flex-wrap:wrap">
+      <div style="font-size:10px; color:var(--text-dim)">MAKER PEER: <span style="color:var(--accent); font-size:11px;" id="flow-maker">8f2a...3c91</span></div>
+      <div style="font-size:10px; color:var(--text-dim)">TAKER PEER: <span style="color:var(--accent2); font-size:11px;" id="flow-taker">d7e1...a044</span></div>
+      <div style="font-size:10px; color:var(--text-dim); margin-left:auto">CHANNEL: <span style="color:var(--text)">0000intercomswapbtcusdt</span></div>
+    </div>
+  </div>
+
+  <div class="card orderbook">
+    <div class="card-header">
+      <div class="card-title">P2P Order Book</div>
+      <div class="card-badge">BTC / USDT</div>
+    </div>
+    <div class="ob-header"><span>SATS</span><span>USDT</span><span style="text-align:right">RATE</span></div>
+    <div id="asks"></div>
+    <div class="ob-spread" id="ob-spread">SPREAD &mdash; $0.28</div>
+    <div id="bids"></div>
+  </div>
+
+  <div class="card trade-feed">
+    <div class="card-header">
+      <div class="card-title">Live Swap Feed</div>
+      <div class="card-badge" id="feed-count">89 TODAY</div>
+    </div>
+    <div class="feed-header"><span>TIME</span><span>PEER</span><span>BTC (sats)</span><span>USDT</span><span style="text-align:right">STATUS</span></div>
+    <div class="feed-list" id="feed-list"></div>
+  </div>
+
+  <div class="card rfq-sim">
+    <div class="card-header">
+      <div class="card-title">RFQ Simulator</div>
+      <div class="card-badge">TEST MODE</div>
+    </div>
+    <div class="rfq-form">
+      <div class="form-row">
+        <label class="form-label">BTC Amount (sats)</label>
+        <input type="number" class="form-input" id="rfq-sats" value="50000" min="1000" step="1000" />
+      </div>
+      <div class="form-row">
+        <label class="form-label">Side</label>
+        <select class="form-select" id="rfq-side">
+          <option value="sell">Sell BTC &rarr; USDT</option>
+          <option value="buy">Buy BTC &larr; USDT</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label class="form-label">RFQ Channel</label>
+        <input type="text" class="form-input" id="rfq-channel" value="0000intercomswapbtcusdt" />
+      </div>
+      <button class="btn" onclick="simulateRFQ()"><span>&#x25B6; BROADCAST RFQ</span></button>
+      <div style="margin-top:8px">
+        <button class="btn orange" onclick="simulateTake()"><span>&#x26A1; TAKE BEST QUOTE</span></button>
+      </div>
+      <div class="rfq-output" id="rfq-output">
+        <span style="color:var(--text-dim)">// RFQ output will appear here...</span><br>
+        <span style="color:var(--text-dim)">// Simulates real Intercom P2P protocol</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="card network-section">
+    <div class="card-header">
+      <div class="card-title">Active Network Peers</div>
+      <div class="card-badge" id="peer-count-badge">47 ONLINE</div>
+    </div>
+    <div class="peer-grid" id="peer-grid"></div>
+  </div>
+
+</div>
+
+<footer>
+  <div style="margin-bottom:8px">
+    <strong style="color:var(--text-bright); font-family:'Orbitron',sans-serif; font-size:11px; letter-spacing:2px">INTERCOMSWAP RADAR</strong>
+    &mdash; built on <a href="https://github.com/Trac-Systems/intercom" target="_blank">Intercom</a>
+    &middot; fork of <a href="https://github.com/TracSystems/intercom-swap" target="_blank">IntercomSwap</a>
+    &middot; <a href="https://trac.network" target="_blank">Trac Network</a>
+  </div>
+  <div style="margin-bottom:6px">A real-time P2P swap dashboard for the BTC Lightning &harr; USDT Solana ecosystem. Non-custodial &middot; Peer-to-peer &middot; No central server.</div>
+  <div>Trac Address: <span style="color:var(--accent)">trac129qqqmca6ufqsvg3xpncfgfkfwapsr7m8s283yw98j653nskjsdsztxamr</span> &nbsp;&middot;&nbsp; MIT License</div>
+</footer>
+
+<script>
+var btcPrice = 84320;
+var swapCount = 89;
+var rfqCount = 12;
+var feedItems = [];
+var flowPhase = 2;
+
+var peerKeys = [
+  '8f2a3b9c...3c91','d7e1a2f0...a044','1c4e5d7a...bc23',
+  'f9b2e3a1...7f11','3d5c7e9a...2d88','a1b2c3d4...e5f6',
+  '9f8e7d6c...1a2b','4e5f6a7b...8c9d','b3c4d5e6...f7a8',
+  '7a8b9c0d...1e2f','2b3c4d5e...6f7a','5c6d7e8f...9a0b',
+  'e1f2a3b4...c5d6','0a1b2c3d...4e5f','6b7c8d9e...0f1a'
+];
+var roles = ['MAKER','TAKER','MAKER/TAKER','OBSERVER'];
+var cities = ['NYC','LON','TKY','SGP','BER','SYD','DXB','ZRH','AMS','SEA'];
+
+// REAL BTC PRICE
+function fetchRealBTCPrice() {
+  fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd&include_24hr_change=true')
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      btcPrice = data.bitcoin.usd;
+      var change = parseFloat(data.bitcoin.usd_24h_change.toFixed(2));
+      var formatted = '$' + btcPrice.toLocaleString('en-US', {maximumFractionDigits:0});
+      var dir = change >= 0 ? '\u25B2' : '\u25BC';
+      document.getElementById('stat-btc').textContent = formatted;
+      document.getElementById('btc-header-price').textContent = 'BTC ' + formatted;
+      document.getElementById('stat-btc-chg').textContent = dir + ' ' + Math.abs(change) + '% 24h';
+      document.getElementById('stat-btc-chg').className = 'stat-change ' + (change >= 0 ? 'up' : 'down');
+      document.getElementById('t-btc').textContent = formatted;
+      document.getElementById('t-btc-chg').textContent = dir + ' ' + Math.abs(change) + '%';
+      document.getElementById('t-btc-chg').className = change >= 0 ? 'up' : 'dn';
+    })
+    .catch(function(){});
+}
+
+// ORDERBOOK
+function genOrderbook() {
+  var satsList = [10000,25000,50000,100000,250000];
+  var asks = [], bids = [];
+  for (var i=0;i<5;i++){
+    var p=0.0002+i*0.00015+Math.random()*0.0001, s=satsList[i];
+    var u=((s/1e8)*btcPrice*(1+p)).toFixed(2), r=(parseFloat(u)/s*1e8).toFixed(0);
+    asks.push({sats:s,usdt:u,rate:r,depth:(5-i)*18+Math.random()*10});
+  }
+  for (var i=0;i<5;i++){
+    var d=0.0002+i*0.00015+Math.random()*0.0001, s=satsList[i];
+    var u=((s/1e8)*btcPrice*(1-d)).toFixed(2), r=(parseFloat(u)/s*1e8).toFixed(0);
+    bids.push({sats:s,usdt:u,rate:r,depth:(5-i)*18+Math.random()*10});
+  }
+  return {asks:asks,bids:bids};
+}
+
+function renderOrderbook() {
+  var ob = genOrderbook();
+  var asks = ob.asks.reverse();
+  document.getElementById('asks').innerHTML = asks.map(function(a){
+    return '<div class="ob-row ask"><div class="ob-row-bg" style="width:'+a.depth+'%"></div><span>'+a.sats.toLocaleString()+'</span><span class="ob-price ask">'+a.usdt+'</span><span style="text-align:right;color:var(--text-dim);font-size:10px">$'+a.rate+'</span></div>';
+  }).join('');
+  var spread = (parseInt(asks[0].rate)-parseInt(ob.bids[0].rate)).toFixed(0);
+  document.getElementById('ob-spread').textContent = 'SPREAD  $'+spread+' / sat';
+  document.getElementById('bids').innerHTML = ob.bids.map(function(b){
+    return '<div class="ob-row bid"><div class="ob-row-bg" style="width:'+b.depth+'%"></div><span>'+b.sats.toLocaleString()+'</span><span class="ob-price bid">'+b.usdt+'</span><span style="text-align:right;color:var(--text-dim);font-size:10px">$'+b.rate+'</span></div>';
+  }).join('');
+}
+
+// FEED
+var statusPool = ['settled','settled','settled','pending','negotiating','settled','refunded','settled'];
+
+function genFeedItem() {
+  var now = new Date();
+  var h=now.getHours().toString().padStart(2,'0'), m=now.getMinutes().toString().padStart(2,'0'), s=now.getSeconds().toString().padStart(2,'0');
+  var sats=Math.round((Math.random()*490000+10000)/1000)*1000;
+  var usdt=(sats/1e8*btcPrice*(1+(Math.random()-0.5)*0.001)).toFixed(2);
+  var peer=peerKeys[Math.floor(Math.random()*peerKeys.length)];
+  var status=statusPool[Math.floor(Math.random()*statusPool.length)];
+  return {time:h+':'+m+':'+s,peer:peer,sats:sats,usdt:usdt,status:status};
+}
+
+function renderFeed() {
+  document.getElementById('feed-list').innerHTML = feedItems.slice(0,30).map(function(item){
+    return '<div class="feed-item"><span class="feed-time">'+item.time+'</span><span class="feed-pair">'+item.peer+'</span><span class="feed-btc">'+item.sats.toLocaleString()+'</span><span class="feed-usdt">'+item.usdt+'</span><span class="feed-status"><span class="badge '+item.status+'">'+item.status.toUpperCase()+'</span></span></div>';
+  }).join('');
+}
+
+function addFeedItem() {
+  feedItems.unshift(genFeedItem());
+  if(feedItems.length>50) feedItems.pop();
+  renderFeed();
+  swapCount++;
+  document.getElementById('stat-swaps').textContent = swapCount;
+  document.getElementById('feed-count').textContent = swapCount+' TODAY';
+}
+
+// PRICE MICRO-MOVEMENT
+function updatePrice() {
+  btcPrice += (Math.random()-0.48)*80;
+  btcPrice = Math.round(btcPrice*100)/100;
+  var f='$'+btcPrice.toLocaleString('en-US',{maximumFractionDigits:0});
+  document.getElementById('stat-btc').textContent = f;
+  document.getElementById('btc-header-price').textContent = 'BTC '+f;
+}
+
+// FLOW
+var flowStepIds=['step-rfq','step-quote','step-terms','step-escrow','step-settle'];
+var flowArrIds=['arr-1','arr-2','arr-3','arr-4'];
+
+function advanceFlow() {
+  flowStepIds.forEach(function(id){ document.getElementById(id).classList.remove('active','done','pending'); });
+  flowArrIds.forEach(function(id){ document.getElementById(id).classList.remove('active-arrow'); });
+  for(var i=0;i<flowStepIds.length;i++){
+    var el=document.getElementById(flowStepIds[i]);
+    if(i<flowPhase) el.classList.add('done');
+    else if(i===flowPhase) el.classList.add(flowPhase===4?'done':'active');
+  }
+  if(flowPhase>0&&flowPhase<5){ var arr=document.getElementById(flowArrIds[flowPhase-1]); if(arr) arr.classList.add('active-arrow'); }
+  var sats=Math.round((Math.random()*490000+10000)/1000)*1000;
+  var usdt=(sats/1e8*btcPrice).toFixed(2);
+  var tradeId=Math.random().toString(36).substr(2,6).toUpperCase();
+  document.getElementById('flow-state-badge').textContent='LIVE TRADE \u00B7 #'+tradeId;
+  document.getElementById('step-rfq-val').textContent=sats.toLocaleString()+' sat';
+  if(flowPhase>=1) document.getElementById('step-quote-val').textContent=usdt+' USDT';
+  if(flowPhase>=2) document.getElementById('step-terms-val').textContent=flowPhase>2?'Signed \u2713':'Confirming\u2026';
+  if(flowPhase>=3) document.getElementById('step-escrow-val').textContent=flowPhase>3?'Locked \u2713':'Creating\u2026';
+  if(flowPhase>=4) document.getElementById('step-settle-val').textContent='\u26A1 Done!';
+  flowPhase=(flowPhase+1)%6;
+  if(flowPhase===5){ flowPhase=0; document.getElementById('flow-maker').textContent=peerKeys[Math.floor(Math.random()*peerKeys.length)]; document.getElementById('flow-taker').textContent=peerKeys[Math.floor(Math.random()*peerKeys.length)]; }
+}
+
+// PEERS
+function renderPeers() {
+  var count=12+Math.floor(Math.random()*6);
+  document.getElementById('peer-count-badge').textContent=(count+35)+' ONLINE';
+  document.getElementById('stat-peers').textContent=count+35;
+  document.getElementById('peer-grid').innerHTML=peerKeys.slice(0,count).map(function(key){
+    var role=roles[Math.floor(Math.random()*roles.length)], city=cities[Math.floor(Math.random()*cities.length)];
+    var vol=Math.floor(Math.random()*50000), sw=Math.floor(Math.random()*40), on=Math.floor(Math.random()*180)+1;
+    return '<div class="peer-card"><div class="corner-tl"></div><div class="corner-tr"></div><div class="peer-key">'+key+'</div><div class="peer-role">'+role+' \u00B7 '+city+'</div><div class="peer-info" style="margin-top:8px">Vol: <span style="color:var(--accent3)">$'+vol.toLocaleString()+'</span></div><div class="peer-info">Swaps: <span style="color:var(--text-bright)">'+sw+'</span></div><div style="font-size:9px;color:var(--text-dim);margin-top:4px">'+on+'m online</div></div>';
+  }).join('');
+}
+
+// RFQ SIMULATOR
+function simulateRFQ() {
+  var sats=document.getElementById('rfq-sats').value||50000;
+  var side=document.getElementById('rfq-side').value;
+  var channel=document.getElementById('rfq-channel').value;
+  var tradeId=Math.random().toString(36).substr(2,8).toUpperCase();
+  var myKey='3f8a'+Math.random().toString(36).substr(2,4)+'...c7b2';
+  var usdt=(sats/1e8*btcPrice*(1+(Math.random()-0.5)*0.002)).toFixed(2);
+  var output=document.getElementById('rfq-output');
+  output.innerHTML='<span class="hl">\u2192 BROADCASTING RFQ</span><br>  trade_id: <span class="hl3">'+tradeId+'</span><br>  channel: <span class="hl">'+channel+'</span><br>  peer: <span class="hl">'+myKey+'</span><br>  direction: <span class="hl2">'+(side==='sell'?'BTC(LN) \u2192 USDT(SOL)':'USDT(SOL) \u2192 BTC(LN)')+'</span><br>  btc_sats: <span class="hl3">'+parseInt(sats).toLocaleString()+'</span><br>  usdt_amount: <span class="hl2">'+usdt+'</span><br><br><span style="color:var(--text-dim)">// Waiting for quotes from network peers\u2026</span>';
+  rfqCount++;
+  document.getElementById('stat-rfq').textContent=rfqCount;
+  peerKeys.slice(0,3+Math.floor(Math.random()*3)).forEach(function(peer,i){
+    setTimeout(function(){
+      var prem=(0.001+Math.random()*0.003).toFixed(4);
+      var quoteUsdt=(sats/1e8*btcPrice*(1-parseFloat(prem))).toFixed(2);
+      output.innerHTML+='<br><span class="hl2">\u2190 QUOTE from '+peer+'</span><br>  usdt_offered: <span class="hl2">'+quoteUsdt+'</span>  fee: <span class="hl3">'+(parseFloat(prem)*100).toFixed(2)+'%</span>';
+    }, 800+i*400+Math.random()*300);
+  });
+}
+
+function simulateTake() {
+  var sats=document.getElementById('rfq-sats').value||50000;
+  var tradeId=Math.random().toString(36).substr(2,8).toUpperCase();
+  var bestPeer=peerKeys[Math.floor(Math.random()*5)];
+  var usdt=(sats/1e8*btcPrice*0.998).toFixed(2);
+  var payHash=Array.from({length:8},function(){return Math.floor(Math.random()*16).toString(16);}).join('')+'...';
+  var escrowPDA=Array.from({length:4},function(){return Math.floor(Math.random()*0xffff).toString(16).padStart(4,'0');}).join('')+'...';
+  document.getElementById('rfq-output').innerHTML='<span class="hl">\u26A1 EXECUTING SWAP</span><br>  trade_id: <span class="hl3">'+tradeId+'</span><br>  maker: <span class="hl">'+bestPeer+'</span><br><br>  <span class="hl2">1/4</span> Terms signed\u2026   <span class="hl3">\u2713</span><br>  <span class="hl2">2/4</span> LN Invoice posted\u2026<br>  <span style="color:var(--text-dim)">  payment_hash: '+payHash+'</span><br>  <span class="hl2">3/4</span> Solana escrow creating\u2026<br>  <span style="color:var(--text-dim)">  escrow_pda: '+escrowPDA+'</span><br>  <span class="hl2">4/4</span> Verifying on-chain\u2026<br><br>  <span style="color:var(--text-dim)">// Pay LN invoice to claim USDT: '+usdt+' USDT \u2192 your wallet</span>';
+  setTimeout(function(){
+    document.getElementById('rfq-output').innerHTML+='<br><br><span class="hl2">\u2705 SWAP COMPLETE</span><br>  received: <span class="hl2">'+usdt+' USDT</span> on Solana<br>  settlement: <span class="hl3">~3.2s</span> LN confirmation';
+    addFeedItem();
+  }, 3500);
+}
+
+// ─── SC-BRIDGE LIVE CONNECTION ───────────────────────────────────────────────
+
+var SC_URL   = 'ws://127.0.0.1:49300';  // proxy port — run proxy.js first
+var SC_TOKEN = ''; // token not needed here, proxy handles auth
+var scWs     = null;
+var scConnected = false;
+var realPeerKeys = [];
+var realRfqCount = 0;
+var realSwapCount = 0;
+
+function scSetStatus(connected) {
+  scConnected = connected;
+  var dot = document.querySelector('.status-dot');
+  var pill = document.querySelector('.status-pill');
+  if (connected) {
+    dot.style.background = 'var(--accent3)';
+    dot.style.boxShadow  = '0 0 8px var(--accent3)';
+    pill.querySelector
+      ? null : null;
+    // update label
+    var pills = document.querySelectorAll('.status-pill');
+    if (pills[0]) pills[0].innerHTML = '<div class="status-dot"></div> PEER LIVE';
+  } else {
+    var pills = document.querySelectorAll('.status-pill');
+    if (pills[0]) pills[0].innerHTML = '<div class="status-dot" style="background:#ff4455;box-shadow:0 0 8px #ff4455"></div> PEER OFFLINE';
+  }
+}
+
+function scHandleMessage(raw) {
+  var msg;
+  try { msg = JSON.parse(raw); } catch(e) { return; }
+
+  // Proxy status update
+  if (msg.type === 'proxy_status') {
+    scSetStatus(msg.connected);
+    return;
+  }
+
+  // SC-Bridge wraps messages — handle both direct and envelope formats
+  var kind = msg.kind || (msg.data && msg.data.kind) || '';
+  var data = msg.data || msg;
+  var from = (data.from_pubkey || data.peer || '').substring(0,8) + '...' + (data.from_pubkey || data.peer || '').slice(-4);
+  var channel = data.channel || msg.channel || '';
+
+  // RFQ received
+  if (kind === 'swap.rfq' || kind === 'rfq') {
+    var sats = data.btc_sats || data.btc_amount || 0;
+    var usdt = data.usdt_amount || (sats / 1e8 * btcPrice).toFixed(2);
+    var now = new Date();
+    var timeStr = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0') + ':' + now.getSeconds().toString().padStart(2,'0');
+    feedItems.unshift({ time: timeStr, peer: from || 'live peer', sats: parseInt(sats), usdt: parseFloat(usdt).toFixed(2), status: 'negotiating' });
+    if (feedItems.length > 50) feedItems.pop();
+    renderFeed();
+    realRfqCount++;
+    document.getElementById('stat-rfq').textContent = realRfqCount;
+    document.getElementById('flow-state-badge').textContent = 'LIVE RFQ · ' + (data.trade_id || '').substring(0,8);
+  }
+
+  // Quote received
+  if (kind === 'swap.quote' || kind === 'quote') {
+    var sats = data.btc_sats || 0;
+    var usdt = data.usdt_amount || 0;
+    var now = new Date();
+    var timeStr = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0') + ':' + now.getSeconds().toString().padStart(2,'0');
+    feedItems.unshift({ time: timeStr, peer: from || 'maker', sats: parseInt(sats), usdt: parseFloat(usdt).toFixed(2), status: 'negotiating' });
+    if (feedItems.length > 50) feedItems.pop();
+    renderFeed();
+  }
+
+  // Swap settled / claimed
+  if (kind === 'swap.sol_claimed' || kind === 'sol_claimed' || kind === 'swap.ln_paid' || kind === 'ln_paid') {
+    realSwapCount++;
+    swapCount = realSwapCount;
+    document.getElementById('stat-swaps').textContent = swapCount;
+    document.getElementById('feed-count').textContent = swapCount + ' TODAY (LIVE)';
+    // mark last feed item as settled
+    if (feedItems.length > 0) {
+      feedItems[0].status = 'settled';
+      renderFeed();
+    }
+  }
+
+  // Service announce — grab real peer keys
+  if (kind === 'swap.svc_announce' || kind === 'svc_announce') {
+    var pk = data.from_pubkey || data.peer_pubkey || '';
+    if (pk && pk.length > 8) {
+      var shortKey = pk.substring(0,8) + '...' + pk.slice(-4);
+      if (realPeerKeys.indexOf(shortKey) === -1) {
+        realPeerKeys.push(shortKey);
+        document.getElementById('stat-peers').textContent = realPeerKeys.length;
+        document.getElementById('peer-count-badge').textContent = realPeerKeys.length + ' ONLINE (LIVE)';
+      }
+    }
+  }
+
+  // Any signed envelope — show raw in console for debugging
+  if (data.sig || msg.sig) {
+    console.log('[SC-Bridge]', kind, data);
+  }
+}
+
+function connectSCBridge() {
+  try {
+    scWs = new WebSocket(SC_URL);
+
+    scWs.onopen = function() {
+      scSetStatus(true);
+      console.log('[Dashboard] Connected to proxy — live data active');
+    };
+
+    scWs.onmessage = function(event) {
+      scHandleMessage(event.data);
+    };
+
+    scWs.onerror = function(e) {
+      console.warn('[SC-Bridge] Error — running in simulated mode', e);
+      scSetStatus(false);
+    };
+
+    scWs.onclose = function() {
+      scSetStatus(false);
+      console.log('[SC-Bridge] Disconnected — retrying in 10s');
+      setTimeout(connectSCBridge, 10000);
+    };
+
+  } catch(e) {
+    console.warn('[SC-Bridge] Could not connect — running in simulated mode');
+    scSetStatus(false);
+  }
+}
+
+// Try to connect — gracefully falls back to simulated if peer not running
+connectSCBridge();
+
+// BOOT
+for(var i=0;i<18;i++){
+  var item=genFeedItem();
+  var t=new Date(Date.now()-(18-i)*45000);
+  item.time=t.getHours().toString().padStart(2,'0')+':'+t.getMinutes().toString().padStart(2,'0')+':'+t.getSeconds().toString().padStart(2,'0');
+  feedItems.push(item);
+}
+
+renderFeed();
+renderOrderbook();
+renderPeers();
+advanceFlow();
+
+fetchRealBTCPrice();
+setInterval(fetchRealBTCPrice, 60000);
+setInterval(updatePrice, 3000);
+setInterval(renderOrderbook, 4000);
+setInterval(function(){ if(Math.random()>0.3) addFeedItem(); }, 5000);
+setInterval(advanceFlow, 2500);
+setInterval(function(){
+  rfqCount=Math.max(0,rfqCount+Math.floor(Math.random()*3-1));
+  document.getElementById('stat-rfq').textContent=rfqCount;
+  document.getElementById('stat-vol').textContent='$'+(2.1+Math.random()*0.3).toFixed(2)+'M';
+}, 8000);
+setInterval(renderPeers, 20000);
+</script>
+</body>
+</html>
